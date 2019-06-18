@@ -2,4 +2,7 @@
 .Rhistory
 *~
 *.zip
+*.csv
+*.tsv
+*.dat
 .ipynb_checkpoints
