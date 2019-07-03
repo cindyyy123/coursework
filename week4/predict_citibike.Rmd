@@ -1,0 +1,82 @@
+---
+title: "predict_citibike.Rmd"
+output: html_document
+---
+library(tidyverse)
+library(lubridate)
+library(broom)
+
+trips_per_day <- read_tsv('trips_per_day.tsv')
+trips_per_day %>% View()
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+trips_per_day <- trips_per_day %>%
+  mutate(day = wday(ymd)) %>% 
+  mutate(true_if_wknd = day == 1 | day == 7)
+
+
+shuffle <- sample_frac(trips_per_day, 1) %>% 
+  mutate(rows = row_number())
+
+training <- shuffle %>% 
+  filter(rows <= floor(.80 * nrow(shuffle)))
+
+validation <- shuffle %>% 
+  filter(rows > floor(.20 * nrow(shuffle))) 
+
+
+model <- lm(num_trips ~ tmax + prcp + true_if_wknd, data = training)
+summary(model)
+
+training1 <- training %>% add_predictions(model)
+
+
+validation1 <- validation %>% add_predictions(model)
+
+ 
+rmse(model, training1)
+rmse(model, validation1)
+
+shuffle <- sample_frac(trips_per_day, 1) %>% 
+  mutate((fold = row_number() %% 5) + 1)
+
+fold <- 5
+r_sq <- rep(0,fold)
+rmse <- rep(0, fold)
+
+for(i in 1:fold)
+{
+  training3 <- shuffle %>% filter(fold != i)
+  validation3 <- shuffle %>% filter(fold == i)
+  model <- lm(num_trips ~ tmax + prcp + true_if_wknd, data = training)
+  r_sq[i] <- rsquare(model, training)
+  rmse[i] <- rmse(model, validation)
+}
+
+mean(r_sq[i])
+
+
+```
+```{r}
+#Plot your final best fit model in two different ways. First with the date on the x-axis and the number of trips on the y-axis, showing the actual values as points and predicted values as a line. Second as a plot where the x-axis is the predicted value and the y-axis is the actual value, with each point representing one day.
+
+trips_per_day %>%
+  add_predictions(model) %>%
+  ggplot(aes(x = ymd)) + 
+  geom_point(aes(y = num_trips), color = 'blue') +
+  geom_line(aes(y = pred), color = 'red') +
+    scale_y_continuous(labels = comma)
+
+trips_per_day %>%
+  add_predictions(model) %>%
+  ggplot(aes(x = pred)) + 
+  geom_point(aes(y = num_trips), color = 'magenta') +
+    scale_y_continuous(labels = comma)
+
+```
+
